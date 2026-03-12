@@ -8,17 +8,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔴 আপনার ডাটাবেস লিংক
+// 🔴 ডাটাবেস লিংক (এখানে নাম চেঞ্জ করা যাবে না, করলে কানেকশন এরর হবে)
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://sharafattaslima20625_db_user:Smart1234@sharafat.pnaikku.mongodb.net/?appName=sharafat";
 
-// 🔴 আপনার অ্যাডমিন পাসওয়ার্ড (এটি দিয়ে আপনি ব্রাউজার থেকে কন্ট্রোল করবেন)
+// 🔴 আপনার সিক্রেট অ্যাডমিন পাসওয়ার্ড
 const ADMIN_PASS = "smart123"; 
 
 mongoose.connect(MONGODB_URI)
   .then(() => console.log("✅ Database Connected Successfully!"))
   .catch(err => console.error("❌ Database Connection Error:", err));
 
-// 💡 লাইসেন্স স্কিমা (অটো ৩০ দিন মেয়াদ সেট করা হয়েছে)
+// 💡 লাইসেন্স স্কিমা
 const licenseSchema = new mongoose.Schema({
     key: { type: String, unique: true, required: true },
     maxDevices: { type: Number, default: 1 }, 
@@ -26,61 +26,53 @@ const licenseSchema = new mongoose.Schema({
     isActive: { type: Boolean, default: true },
     expiryDate: { 
         type: Date, 
-        // নতুন বানালেই অটোমেটিক বর্তমান সময় থেকে ৩০ দিন যোগ হয়ে যাবে
         default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) 
     }
 });
 const License = mongoose.model('License', licenseSchema);
 
-
 // ==========================================
-// 🛠️ সিক্রেট অ্যাডমিন কন্ট্রোল (ব্রাউজার থেকে করার জন্য)
+// 🛠️ সিক্রেট অ্যাডমিন কন্ট্রোল 
 // ==========================================
 
-// ১. নতুন লাইসেন্স বানানো (অটো ৩০ দিন):
 app.get('/api/admin/create', async (req, res) => {
     if (req.query.pass !== ADMIN_PASS) return res.send("❌ Wrong Password!");
-    if (!req.query.key) return res.send("❌ Please provide a key. Example: ?key=VIP-01");
+    if (!req.query.key) return res.send("❌ Please provide a key. Example: ?key=SMARTIT-01");
 
     try {
         const newLicense = new License({ key: req.query.key });
         await newLicense.save();
-        res.send(`✅ Success! Key [${req.query.key}] is created. It will automatically expire after 30 days.`);
+        res.send(`✅ Success! Key [${req.query.key}] is created. Expires in 30 days.`);
     } catch (err) {
         res.send("❌ Error: Key already exists or database error.");
     }
 });
 
-// ২. পিসি লক রিসেট করা (উইন্ডোজ দিলে বা পিসি বদলালে):
 app.get('/api/admin/reset', async (req, res) => {
     if (req.query.pass !== ADMIN_PASS) return res.send("❌ Wrong Password!");
-    
     const license = await License.findOne({ key: req.query.key });
     if (!license) return res.send("❌ Key not found!");
 
-    license.registeredDevices = []; // ডিভাইস ক্লিয়ার করে দিলাম
+    license.registeredDevices = [];
     await license.save();
-    res.send(`✅ Success! PC Lock cleared for [${req.query.key}]. Customer can login on a new PC now.`);
+    res.send(`✅ Success! PC Lock cleared for [${req.query.key}].`);
 });
 
-// ৩. মেয়াদ বাড়ানো (Extend Expiry):
 app.get('/api/admin/extend', async (req, res) => {
     if (req.query.pass !== ADMIN_PASS) return res.send("❌ Wrong Password!");
-    
-    const days = parseInt(req.query.days) || 30; // বাই ডিফল্ট ৩০ দিন বাড়াবে
+    const days = parseInt(req.query.days) || 30;
     const license = await License.findOne({ key: req.query.key });
     if (!license) return res.send("❌ Key not found!");
 
     const currentExpiry = license.expiryDate && license.expiryDate > new Date() ? new Date(license.expiryDate) : new Date();
     license.expiryDate = new Date(currentExpiry.getTime() + days * 24 * 60 * 60 * 1000);
-    license.isActive = true; // ব্লক থাকলে আনব্লক হয়ে যাবে
+    license.isActive = true;
     await license.save();
     res.send(`✅ Success! Added ${days} more days to [${req.query.key}].`);
 });
 
-
 // ==========================================
-// 🚀 ক্লায়েন্টদের জন্য API (আগের মতোই থাকবে)
+// 🚀 ক্লায়েন্টদের জন্য API
 // ==========================================
 
 app.post('/api/license/authorize', async (req, res) => {
