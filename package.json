@@ -1,7 +1,7 @@
 {
-  "name": "sharafat-server",
+  "name": "smartit-server",
   "version": "1.0.0",
-  "description": "Backend for Sharafat Script",
+  "description": "Backend for SMARTIT Script",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
